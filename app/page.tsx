@@ -1,8 +1,8 @@
-import Link from "next/link";
+import { AuthLandingActions } from "@/app/components/AuthLandingActions";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
+    <div className="min-h-screen bg-linear-to-br from-zinc-50 via-white to-zinc-100">
       <main className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-6 py-24">
         <section className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="flex flex-col gap-6">
@@ -16,13 +16,8 @@ export default function Home() {
               Escolha um tema, responda 20 perguntas e ganhe recompensas com base no
               seu desempenho. Tudo pensado para sessões rápidas, claras e divertidas.
             </p>
-            <div className="flex flex-wrap gap-4">
-              <Link
-                href="/quizzes"
-                className="rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
-              >
-                Explorar quizzes
-              </Link>
+            <div className="flex flex-wrap items-center gap-4">
+              <AuthLandingActions />
               <span className="rounded-full border border-zinc-200 px-6 py-3 text-sm text-zinc-500">
                 MVP focado em velocidade e clareza
               </span>

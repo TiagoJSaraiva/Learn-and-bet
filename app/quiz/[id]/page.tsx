@@ -5,22 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 
 import { Popup } from "@/app/components/Popup";
+import { useAuth } from "@/app/components/AuthProvider";
 import type { Quiz, QuizConfig, QuizQuestion } from "@/lib/types/quiz";
-
-const moneyStorageKey = "learn-bet.money";
-
-const getStoredMoney = (fallback: number) => {
-  if (typeof window === "undefined") return fallback;
-  const stored = window.localStorage.getItem(moneyStorageKey);
-  if (!stored) return fallback;
-  const parsed = Number(stored);
-  return Number.isNaN(parsed) ? fallback : parsed;
-};
-
-const setStoredMoney = (value: number) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(moneyStorageKey, value.toString());
-};
 
 const pickQuestions = (questions: QuizQuestion[], count: number) => {
   const pool = [...questions];
@@ -34,9 +20,9 @@ const pickQuestions = (questions: QuizQuestion[], count: number) => {
 export default function QuizSessionPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { money, updateMoney } = useAuth();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [config, setConfig] = useState<QuizConfig | null>(null);
-  const [money, setMoney] = useState<number | null>(null);
   const [sessionQuestions, setSessionQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -57,10 +43,6 @@ export default function QuizSessionPage() {
 
       const configData = await configResponse.json();
       setConfig(configData);
-      const storedMoney = getStoredMoney(configData.initialMoney);
-      setMoney(storedMoney);
-      setStoredMoney(storedMoney);
-
       if (!quizResponse.ok) {
         setQuiz(null);
         return;
@@ -103,7 +85,7 @@ export default function QuizSessionPage() {
 
   const handleStart = () => {
     if (!quiz || !difficulty || !config) return;
-    const currentMoney = getStoredMoney(config.initialMoney);
+    const currentMoney = money ?? config.initialMoney;
 
     if (currentMoney < difficulty.startCost) {
       setPopupMessage("Saldo insuficiente para iniciar este quiz.");
@@ -111,8 +93,7 @@ export default function QuizSessionPage() {
     }
 
     const updatedMoney = currentMoney - difficulty.startCost;
-    setMoney(updatedMoney);
-    setStoredMoney(updatedMoney);
+    updateMoney(updatedMoney);
     setSessionQuestions(pickQuestions(quiz.questions, 20));
     setCurrentIndex(0);
     setCorrectCount(0);
@@ -137,12 +118,8 @@ export default function QuizSessionPage() {
 
     if (answeredCorrectly) {
       setCorrectCount((prev) => prev + 1);
-      setMoney((prev) => {
-        if (prev === null) return prev;
-        const updated = prev + difficulty.rewardPerCorrect;
-        setStoredMoney(updated);
-        return updated;
-      });
+      const updated = (money ?? 0) + difficulty.rewardPerCorrect;
+      updateMoney(updated);
     }
 
     setTimeout(() => {
