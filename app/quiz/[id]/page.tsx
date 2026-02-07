@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -20,7 +20,7 @@ const pickQuestions = (questions: QuizQuestion[], count: number) => {
 export default function QuizSessionPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { money, updateMoney } = useAuth();
+  const { user, money, updateMoney, incrementQuizzesDone } = useAuth();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [config, setConfig] = useState<QuizConfig | null>(null);
   const [sessionQuestions, setSessionQuestions] = useState<QuizQuestion[]>([]);
@@ -32,6 +32,7 @@ export default function QuizSessionPage() {
   const [isFinished, setIsFinished] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [popupMessage, setPopupMessage] = useState<string | null>(null);
+  const hasReportedCompletion = useRef(false);
 
   useEffect(() => {
     const load = async () => {
@@ -98,6 +99,7 @@ export default function QuizSessionPage() {
     setCurrentIndex(0);
     setCorrectCount(0);
     setIsFinished(false);
+    hasReportedCompletion.current = false;
     resetQuestionState();
     setIsStarted(true);
   };
@@ -138,6 +140,12 @@ export default function QuizSessionPage() {
   };
 
   const handlePopupClose = () => setPopupMessage(null);
+
+  useEffect(() => {
+    if (!isFinished || hasReportedCompletion.current || !user) return;
+    hasReportedCompletion.current = true;
+    incrementQuizzesDone();
+  }, [incrementQuizzesDone, isFinished, user]);
 
   if (!config || money === null) {
     return (

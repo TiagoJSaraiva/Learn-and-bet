@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/app/components/AuthProvider";
 import { MoneyChoiceModal } from "@/app/components/MoneyChoiceModal";
+import { GlobalPopup } from "@/app/components/GlobalPopup";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <MoneyChoiceModal />
+          <GlobalPopup />
         </AuthProvider>
       </body>
     </html>

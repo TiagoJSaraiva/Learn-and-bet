@@ -62,6 +62,14 @@ export default function RegisterPage() {
             </p>
           </header>
 
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="rounded-2xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700"
+          >
+            Voltar ao menu
+          </button>
+
           {!awaitingConfirmation ? (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <label className="flex flex-col gap-2 text-sm font-medium text-zinc-700">
@@ -134,11 +142,6 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between text-sm text-zinc-500">
-            <Link href="/login" className="font-medium text-zinc-700">
-              Já tenho conta
-            </Link>
-          </div>
         </div>
       </main>
     </div>

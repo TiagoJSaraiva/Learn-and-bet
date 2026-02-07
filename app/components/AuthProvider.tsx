@@ -18,6 +18,7 @@ const defaultMoney = 200;
 type Profile = {
   id: string;
   name: string | null;
+  nickname: string | null;
   money: number;
   quizzes_done_amount: number;
 };
@@ -35,6 +36,7 @@ type AuthContextValue = {
   loading: boolean;
   moneyChoice: MoneyChoice | null;
   updateMoney: (value: number) => Promise<void>;
+  incrementQuizzesDone: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   resolveMoneyChoice: (choice: "local" | "account") => Promise<void>;
   clearMoneyChoice: () => void;
@@ -72,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, name, money, quizzes_done_amount")
+      .select("id, name, nickname, money, quizzes_done_amount")
       .eq("id", user.id)
       .single();
 
@@ -98,6 +100,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     [supabase, user]
   );
+
+  const incrementQuizzesDone = useCallback(async () => {
+    if (!user) return;
+    const currentCount = profile?.quizzes_done_amount ?? 0;
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        quizzes_done_amount: currentCount + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+
+    if (!error) {
+      setProfile((prev) =>
+        prev
+          ? { ...prev, quizzes_done_amount: prev.quizzes_done_amount + 1 }
+          : prev
+      );
+    }
+  }, [profile?.quizzes_done_amount, supabase, user]);
 
   const resolveMoneyChoice = useCallback(
     async (choice: "local" | "account") => {
@@ -165,19 +187,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, refreshProfile, initialAuthChecked]);
 
   useEffect(() => {
-    if (!shouldPromptMoneyChoice || !user || !profile || money === null) return;
+    if (!user || !profile) return;
 
-    if (localMoneySnapshot <= defaultMoney) {
+    if (shouldPromptMoneyChoice) {
+      if (localMoneySnapshot > defaultMoney) {
+        if (localMoneySnapshot === profile.money) {
+          setShouldPromptMoneyChoice(false);
+          return;
+        }
+        setMoneyChoice({
+          localMoney: localMoneySnapshot,
+          accountMoney: profile.money,
+        });
+        setShouldPromptMoneyChoice(false);
+        return;
+      }
+
       setShouldPromptMoneyChoice(false);
-      return;
     }
 
-    setMoneyChoice({
-      localMoney: localMoneySnapshot,
-      accountMoney: profile.money,
-    });
-    setShouldPromptMoneyChoice(false);
-  }, [shouldPromptMoneyChoice, user, profile, money, localMoneySnapshot]);
+    // Default behavior: use account money after login.
+    setMoney(profile.money);
+    setStoredMoney(profile.money);
+  }, [
+    user,
+    profile,
+    shouldPromptMoneyChoice,
+    localMoneySnapshot,
+  ]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -188,6 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       moneyChoice,
       updateMoney,
+      incrementQuizzesDone,
       refreshProfile,
       resolveMoneyChoice,
       clearMoneyChoice,
@@ -200,6 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       moneyChoice,
       updateMoney,
+      incrementQuizzesDone,
       refreshProfile,
       resolveMoneyChoice,
       clearMoneyChoice,

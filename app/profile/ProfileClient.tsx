@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Popup } from "@/app/components/Popup";
@@ -12,6 +12,7 @@ type ProfileClientProps = {
   profile: {
     id: string;
     name: string | null;
+    nickname: string | null;
     money: number;
     quizzes_done_amount: number;
   };
@@ -19,14 +20,12 @@ type ProfileClientProps = {
 
 export function ProfileClient({ userEmail, profile }: ProfileClientProps) {
   const router = useRouter();
-  const { updateMoney, profile: liveProfile } = useAuth();
+  const { updateMoney, profile: liveProfile, refreshProfile } = useAuth();
   const resolvedProfile = liveProfile ?? profile;
   const [popupMessage, setPopupMessage] = useState<string | null>(null);
   const [loadingLogout, setLoadingLogout] = useState(false);
-  const [loadingOtp, setLoadingOtp] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [nickname, setNickname] = useState(resolvedProfile.nickname ?? "");
+  const [savingNickname, setSavingNickname] = useState(false);
 
   const handleLogout = async () => {
     setLoadingLogout(true);
@@ -37,73 +36,60 @@ export function ProfileClient({ userEmail, profile }: ProfileClientProps) {
     router.replace("/");
   };
 
-  const handleRequestPasswordOtp = async () => {
-    setLoadingOtp(true);
-    const redirectTo = `${window.location.origin}/auth/reset`;
-    const { error } = await supabaseBrowserClient.auth.resetPasswordForEmail(
-      userEmail,
-      { redirectTo }
-    );
-    setLoadingOtp(false);
+  useEffect(() => {
+    setNickname(resolvedProfile.nickname ?? "");
+  }, [resolvedProfile.nickname]);
 
-    if (error) {
-      setPopupMessage(error.message);
+  const handleSaveNickname = async () => {
+    const trimmed = nickname.trim();
+
+    if (!trimmed) {
+      setPopupMessage("Informe um apelido válido.");
       return;
     }
 
-    setResetSent(true);
-    setPopupMessage("Enviamos um link de redefinição para o seu email.");
-  };
-
-  const handleDeleteAccount = async () => {
-    if (!deletePassword) {
-      setPopupMessage("Informe sua senha para confirmar.");
+    if (trimmed.length > 20) {
+      setPopupMessage("O apelido deve ter no máximo 20 caracteres.");
       return;
     }
 
-    setDeletingAccount(true);
-
-    const { error: signInError } =
-      await supabaseBrowserClient.auth.signInWithPassword({
-        email: userEmail,
-        password: deletePassword,
-      });
-
-    if (signInError) {
-      setDeletingAccount(false);
-      setPopupMessage("Senha incorreta.");
-      return;
-    }
-
-    const { data: sessionData } =
-      await supabaseBrowserClient.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
+    setSavingNickname(true);
+    const { data } = await supabaseBrowserClient.auth.getSession();
+    const accessToken = data.session?.access_token;
 
     if (!accessToken) {
-      setDeletingAccount(false);
+      setSavingNickname(false);
       setPopupMessage("Não foi possível validar a sessão.");
       return;
     }
 
-    const response = await fetch("/api/account/delete", {
+    const response = await fetch("/api/profile/nickname", {
       method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
+      body: JSON.stringify({ nickname: trimmed }),
     });
 
-    if (!response.ok) {
-      setDeletingAccount(false);
-      setPopupMessage("Não foi possível excluir a conta.");
+    setSavingNickname(false);
+
+    if (response.status === 409) {
+      setPopupMessage(
+        "Esse apelido não está disponível. Tente novamente com outro."
+      );
       return;
     }
 
-    await supabaseBrowserClient.auth.signOut();
-    await updateMoney(200);
-    setDeletingAccount(false);
-    setPopupMessage("Conta excluída com sucesso!");
-    router.replace("/");
+    if (!response.ok) {
+      setPopupMessage("Não foi possível salvar o apelido.");
+      return;
+    }
+
+    await refreshProfile();
+    setPopupMessage("Apelido atualizado com sucesso!");
   };
+
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -158,53 +144,58 @@ export function ProfileClient({ userEmail, profile }: ProfileClientProps) {
               <p className="text-sm font-semibold text-zinc-900">{userEmail}</p>
             </div>
           </div>
+
+          <div className="mt-6 flex flex-col gap-3">
+            <label className="text-sm font-medium text-zinc-700">
+              Apelido
+            </label>
+            <div className="flex flex-wrap gap-3">
+              <input
+                type="text"
+                maxLength={20}
+                value={nickname}
+                onChange={(event) => setNickname(event.target.value)}
+                className="flex-1 rounded-2xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800"
+                placeholder="Seu apelido"
+              />
+              <button
+                type="button"
+                onClick={handleSaveNickname}
+                disabled={savingNickname}
+                className="rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {savingNickname ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <h2 className="text-xl font-semibold text-zinc-900">Trocar senha</h2>
           <p className="mt-2 text-sm text-zinc-600">
-            Envie um código OTP para confirmar a alteração.
+            Atualize sua senha informando a senha atual e a nova senha.
           </p>
-
-          {!resetSent ? (
-            <button
-              type="button"
-              onClick={handleRequestPasswordOtp}
-              disabled={loadingOtp}
-              className="mt-4 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white"
-            >
-              {loadingOtp ? "Enviando..." : "Enviar código"}
-            </button>
-          ) : (
-            <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-700">
-              Enviamos um link de redefinição para seu email. Abra o email e
-              clique no link para definir uma nova senha.
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => router.push("/profile/change-password")}
+            className="mt-4 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white"
+          >
+            Mudar senha
+          </button>
         </section>
 
         <section className="rounded-3xl border border-red-200 bg-white p-8 shadow-sm">
           <h2 className="text-xl font-semibold text-zinc-900">Excluir conta</h2>
           <p className="mt-2 text-sm text-zinc-600">
-            Esta ação é permanente. Para confirmar, informe sua senha.
+            Esta ação é permanente e não pode ser desfeita.
           </p>
-          <div className="mt-4 flex flex-col gap-3">
-            <input
-              type="password"
-              value={deletePassword}
-              onChange={(event) => setDeletePassword(event.target.value)}
-              className="rounded-2xl border border-zinc-200 px-4 py-3 text-sm text-zinc-800"
-              placeholder="Senha atual"
-            />
-            <button
-              type="button"
-              onClick={handleDeleteAccount}
-              disabled={deletingAccount}
-              className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white"
-            >
-              {deletingAccount ? "Excluindo..." : "Excluir conta"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/profile/delete-account")}
+            className="mt-4 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white"
+          >
+            Ir para exclusão de conta
+          </button>
         </section>
       </main>
     </div>

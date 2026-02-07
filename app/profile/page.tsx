@@ -24,6 +24,7 @@ export default function ProfilePage() {
     return {
       id: user.id,
       name: profile?.name ?? (user.user_metadata?.name as string | null) ?? null,
+      nickname: profile?.nickname ?? null,
       money: profile?.money ?? money ?? 0,
       quizzes_done_amount: profile?.quizzes_done_amount ?? 0,
     };
